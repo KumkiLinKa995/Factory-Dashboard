@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-hant" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>機器</title>
+
+    <!-- Sweet alert -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Bootstarp5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- CSS & Js -->
+    <link href="css/style.css" rel="stylesheet">
+    <script src="js/function.js"></script>
+    <script src="js/webapi.js"></script>
+</head>
+
+<script>
+    // 用 Webapi 去跟後端呼叫 Machine 的資料，並顯示在 table 上面
+    async function GetMachineList() {
+        // 呼叫後端的 machine 資料。
+        let machinelist = await API_GetMachineList()
+
+        // 指定放入 UI 的表格 ID 和 tbody 欄位
+        let tbody = document.querySelector("#tableMachine tbody");
+
+        // 先清空表格裡面的值。
+        while (tbody.firstChild) {
+            tbody.removeChild(tbody.firstChild);
+        }
+
+        // 建立內容給表格 (根據 WebAPI 抓到的 list 值)
+        machinelist.forEach(element => {
+
+            // 建立一個列
+            let row = document.createElement('tr');
+
+            // 建立一個 ID 的欄位
+            let idCell = document.createElement('td');
+            idCell.textContent = element.id;
+
+            // 建立一個 Name 的欄位
+            let nameCell = document.createElement('td');
+            nameCell.textContent = element.name;
+
+            // 建立一個 Create DateTime 的欄位
+            let dateTimeCell = document.createElement('td');
+            dateTimeCell.textContent = element.createDateTime;
+
+            // 建立一個 Place 的欄位
+            let placeTimeCell = document.createElement('td');
+            placeTimeCell.textContent = element.place;
+
+            // 建立一個 Modfiy Button 的欄位
+            let modifyCell = document.createElement('td');
+
+            // 按鈕設定
+            let modifybtn = document.createElement('button');
+            modifybtn.textContent = '修改';
+            modifybtn.classList.add('btn', 'btn-warning');
+            modifybtn.onclick = () => openModifyModal(element.id, element.name, element.createDateTime, element.place);
+
+            // 加入
+            modifyCell.append(modifybtn);
+
+            // 建立一個 Delete Button 的欄位
+            let deleteCell = document.createElement('td');
+
+            // 按鈕設定
+            let deletebtn = document.createElement('button');
+            deletebtn.textContent = '刪除';
+            deletebtn.classList.add('btn', 'btn-danger');
+            deletebtn.onclick = () => btnDeleteMachine(element.id, element.name);
+
+            // 加入
+            deleteCell.append(deletebtn);
+
+            // 加入欄位列內。
+            row.append(idCell);
+            row.append(nameCell);
+            row.append(dateTimeCell);
+            row.append(placeTimeCell);
+            row.append(modifyCell);
+            row.append(deleteCell);
+
+            // 將列加入到表格的body裡面。
+            tbody.append(row);
+        });
+    }
+
+    // 彈出視窗顯示函式 (避免重複撰寫)
+    function showSwal(title, text, icon, confirmText) {
+        return Swal.fire({
+            title: title,
+            text: text,
+            icon: icon,
+            confirmButtonText: confirmText
+        });
+    }
+
+    // 刪除按鈕事件
+    async function btnDeleteMachine(machineID, machineName) {
+        // 顯示確認刪除的彈出視窗
+        const isCheck = await Swal.fire({
+            title: '刪除',
+            text: `你確定要刪除【${machineID} | ${machineName}】嗎？`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: '刪除',
+            cancelButtonText: '取消'
+        });
+
+        // 如果使用者確認刪除
+        if (isCheck.isConfirmed) {
+            const isDelete = await API_DeleteMachine(machineID);
+
+            if (isDelete.error) {
+                // 顯示錯誤訊息
+                showSwal('錯誤', '刪除失敗，請稍後再試', 'error', '確定');
+                return;
+            }
+
+            // 重新更新機器清單
+            GetMachineList();
+
+            // 顯示刪除成功訊息
+            showSwal('刪除成功', `成功將【${machineID} | ${machineName}】刪除！`, 'success', '確定');
+        }
+    }
+
+    // 新增按鈕事件
+    async function btnAddMachine() {
+        // 抓取使用者輸入的機器名稱和放置區域
+        const name = document.getElementById('txtboxAddMachineName').value;
+        const place = document.getElementById('txtboxAddMachinePlace').value;
+
+        // 呼叫 API 新增機器
+        await API_AddMachine(name, place);
+
+        // 重新更新機器清單
+        GetMachineList();
+
+        // 顯示新增成功訊息
+        Swal.fire({
+            title: '成功',
+            text: `${name} | ${place}`,
+            icon: 'success',
+            confirmButtonText: '確定'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // 清空文字框
+                document.getElementById('txtboxAddMachineName').value = '';
+                document.getElementById('txtboxAddMachinePlace').value = '';
+
+                // 關閉 Modal 視窗
+                const btnCloseModal = document.getElementById('btnCloseAddMachineModal');
+                btnCloseModal.click();
+            }
+        });
+    }
+
+    // 開啟修改機器的 Modal 視窗
+    function openModifyModal(id, name, createtime, place) {
+        // 填入修改框中的預設值
+        const machineID = document.getElementById("txtboxModifyMachineID");
+        const machineName = document.getElementById("txtboxModifyMachineName");
+        const machineCreateTime = document.getElementById("txtboxModifyMachineCreateTime");
+        const machinePlace = document.getElementById("txtboxModifyMachinePlace");
+        machineID.value = id;
+        machineName.value = name;
+        machineCreateTime.value = createtime;
+        machinePlace.value = place;
+
+        // 顯示修改機器的 Modal 視窗
+        const modalElement = document.getElementById('ModifyMachineModal');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    }
+
+    // 修改機器資訊的事件
+    async function btnModifyMachine() {
+        // 取得使用者輸入的修改值
+        const id = document.getElementById('txtboxModifyMachineID').value;
+        const name = document.getElementById('txtboxModifyMachineName').value;
+        const place = document.getElementById('txtboxModifyMachinePlace').value;
+
+        // 呼叫 API 修改機器資料
+        await API_ModifyMachine(id, name, place);
+
+        // 重新更新機器清單
+        GetMachineList();
+
+        // 顯示修改成功訊息
+        Swal.fire({
+            title: '成功',
+            text: `[${id}] ${name} | ${place}`,
+            icon: 'success',
+            confirmButtonText: '確定'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // 關閉 Modal 視窗
+                const btnCloseModal = document.getElementById('btnCloseModifyMachineModal');
+                btnCloseModal.click();
+            }
+        });
+    }
+
+    // 當頁面載入時，載入機器清單
+    window.onload = function () {
+        GetMachineList();
+        const currentTheme = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+        var htmlTag = document.documentElement;
+        if (currentTheme) {
+            // 當使用者的偏好是暗色模式時
+            htmlTag.setAttribute('data-bs-theme', 'dark');
+            this.textContent = '☀️';  // 使用暗色模式時顯示 ☀️
+        } else {
+            // 當使用者的偏好是明亮模式時
+            htmlTag.setAttribute('data-bs-theme', 'light');
+            this.textContent = '🌙';  // 使用明亮模式時顯示 🌙
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+
+        // 設定初始圖示
+        themeToggleBtn.textContent = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? '☀️' : '🌙';
+
+        themeToggleBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+
+            const htmlTag = document.documentElement;
+            const currentTheme = htmlTag.getAttribute('data-bs-theme');
+
+            if (currentTheme === 'light') {
+                htmlTag.setAttribute('data-bs-theme', 'dark');
+                this.textContent = '☀️';
+            } else {
+                htmlTag.setAttribute('data-bs-theme', 'light');
+                this.textContent = '🌙';
+            }
+        });
+    });
+
+
+</script>
+
+<body>
+    <!-- 導覽列 -->
+    <nav class="navbar navbar-expand-sm bg-dark navbar-dark">
+        <div class="container">
+            <ul class="navbar-nav">
+                <a class="nav-link" id="theme-toggle-btn" href="#">切換主題</a>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">工廠</a>
+                <li class="nav-item">
+                    <a class="nav-link active" href="#">機器</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="Project.htm">專案</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 內容 -->
+    <div class="container mt-5 content">
+        <!-- 標題 -->
+        <h1>機器</h1><br>
+
+        <!-- 卡片 -->
+        <div class="card shadow-sm">
+            <div class="card-body">
+
+                <!-- 標籤跟按鈕 -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+
+                    <!-- 標籤 -->
+                    <h5 class="card-title mb-0">機器清單</h5>
+
+                    <!-- 按鈕 -->
+                    <button class="btn btn-outline-info " data-bs-toggle="modal" data-bs-target="#AddMachineModal">
+                        新增
+                    </button>
+                </div>
+
+                <!-- Machine資料的表格 -->
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" id="tableMachine">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>名稱</th>
+                                <th>建立日期</th>
+                                <th>放置區域</th>
+                                <th>修改</th>
+                                <th>刪除</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- 那個令人討厭的 Poppup -->
+    <div class="modal fade" id="AddMachineModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">新增機台</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        id="btnCloseAddMachineModal"></button>
+                </div>
+                <div class="modal-body">
+
+                    <!-- Input the machine name. -->
+                    <div class="mb-3">
+                        <label class="form-label">名稱：</label>
+                        <input type="text" class="form-control" id="txtboxAddMachineName" placeholder="機器名稱">
+                    </div>
+
+                    <!-- Input the place. -->
+                    <div class="mb-3">
+                        <label class="form-label">地點：</label>
+                        <input type="text" class="form-control" id="txtboxAddMachinePlace" placeholder="建立機器地點">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="btnAddMachine()">確定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Modify the machine -->
+    <div class="modal fade" id="ModifyMachineModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content shadow">
+                <div class="modal-header bg-warning text-black">
+                    <h5 class="modal-title">修改機器</h5>
+                    <button type="button" class="btn-close btn-close-black" data-bs-dismiss="modal"
+                        id="btnCloseModifyMachineModal"></button>
+                </div>
+                <div class="modal-body">
+
+                    <!-- Textbox of the MachineID -->
+                    <div class="mb-3">
+                        <label class="form-label">ID：</label>
+                        <input type="text" class="form-control" id="txtboxModifyMachineID" disabled>
+                    </div>
+
+                    <!-- Input the machine name. -->
+                    <div class="mb-3">
+                        <label class="form-label">名稱：</label>
+                        <input type="text" class="form-control" id="txtboxModifyMachineName"
+                            placeholder="Enter the name of the machine.">
+                    </div>
+
+                    <!-- Textbox of machine's CreateTime -->
+                    <div class="mb-3">
+                        <label class="form-label">建立日期：</label>
+                        <input type="text" class="form-control" id="txtboxModifyMachineCreateTime" disabled>
+                    </div>
+
+                    <!-- Input the place. -->
+                    <div class="mb-3">
+                        <label class="form-label">地點：</label>
+                        <input type="text" class="form-control" id="txtboxModifyMachinePlace"
+                            placeholder="Enter the place where the new machine.">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-warning" onclick="btnModifyMachine()">確定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最底下的黑線 -->
+    <footer class="text-center">
+        <p class="mb-0">版權所有 - 2025 智慧製造課程</p>
+    </footer>
+
+    </div>
+    </div>
+    </div>
+</body>
+
+</html>
