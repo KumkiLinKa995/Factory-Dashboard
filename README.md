@@ -57,8 +57,8 @@ dotnet build
 dotnet run
 ```
 ### 3. 瀏覽器存取
-http://localhost:5153
-https://localhost:7243
+* http://localhost:5153
+* https://localhost:7243
 
 ## 🔍 本專案亮點
 
@@ -76,3 +76,4 @@ https://localhost:7243
 
 - **跨平台與可維護性**
   不依賴 Visual Studio，僅需安裝 .NET SDK 即可建置與啟動伺服器，展現專案的可攜性與延展性。  
+
